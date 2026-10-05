@@ -1,55 +1,58 @@
 # CV Web
 
-React-интерфейс для двух локальных API: детекция изображений в `cv-test` и вход/проверка ролей через `keycloak-integration-test`. Вход использует Authorization Code + PKCE. Access token передаётся только в Kotlin API и хранится в памяти вкладки. Детекция в Python остаётся отдельным публичным API.
+React-интерфейс для двух локальных API: детекция изображений в `cv-test` и вход/проверка ролей через `keycloak-integration-test`.
+Вход использует Authorization Code + PKCE. Access token передаётся только в Kotlin API и хранится в памяти вкладки.
+Детекция в Python остаётся отдельным публичным API.
 
-## Запуск
+## Запуск всего приложения
 
-Нужны Node.js, Python-сервис из `../cv-test`, а также Docker и Docker Compose для Kotlin API с Keycloak.
+Используйте единственный Docker Compose из корневого репозитория
+[cv-complex-test](https://github.com/DanyaChetvyrtov/cv-complex-test#запуск-всего-проекта).
+В этом модуле Compose-файлов нет. Корневой Compose собирает этот Dockerfile и запускает Nginx с готовым React UI,
+Python API, Kotlin API и Keycloak.
 
-В трёх терминалах из корня общего проекта:
+Откройте **http://127.0.0.1:5173/**. Этот адрес записан в redirect URI и web origin клиента Keycloak.
+Тестовые аккаунты: `demo / demo123` (USER) и `manager / manager123` (USER, ADMIN).
+Регистрация создаёт пользователя с ролью USER.
 
-```powershell
-cd cv-test
-uvicorn cv_test.api:create_app --factory --host 127.0.0.1 --port 8000
-```
+После входа панель «Учётная запись» показывает профиль и позволяет вызвать публичный, пользовательский
+и административный маршруты. Без токена защищённые маршруты возвращают 401, без нужной роли — 403.
+После обновления страницы или истечения токена войдите снова.
 
-```powershell
-cd keycloak-integration-test
-docker compose up --build -d
-```
+## Разработка с Vite
 
-```powershell
+Нужен Node.js 24. Сначала из корня общего проекта запустите API и Keycloak:
+
+```bash
+docker compose up --build --detach --wait --wait-timeout 600 api cv
+docker compose stop web
 cd cv-web
-npm.cmd install
-npm.cmd run dev
+npm ci
+npm run dev
 ```
 
-Откройте **http://127.0.0.1:5173/**. Используйте этот адрес: он записан в redirect URI и web origin клиента Keycloak. Тестовые аккаунты: `demo / demo123` (USER) и `manager / manager123` (USER, ADMIN). Регистрация создаёт пользователя с ролью USER.
+Откройте тот же **http://127.0.0.1:5173/**. `stop web` освобождает порт, если контейнер UI уже запущен.
+В PowerShell при необходимости используйте `npm.cmd` вместо `npm`.
+Адреса API для Vite можно переопределить в `.env` по [.env.example](.env.example):
+`CV_API_URL` и `KEYCLOAK_API_URL`. После изменения перезапустите Vite.
 
-Если realm `demo` был импортирован до перехода на React UI, один раз обновите его без удаления пользователей:
+## Проксирование
 
-```powershell
-cd keycloak-integration-test
-python scripts/enable_registration.py --keycloak-url http://127.0.0.1:8081
-```
+| Путь в браузере | Путь в сервисе | Vite (локальная разработка) | Nginx (Docker) |
+| --- | --- | --- | --- |
+| `/api/health`, `/api/vision/detect` | `/health`, `/vision/detect` | `http://127.0.0.1:8000` | `http://cv:8000` |
+| `/auth-api/public`, `/auth-api/me`, `/auth-api/user`, `/auth-api/admin` | `/api/public`, `/api/me`, `/api/user`, `/api/admin` | `http://127.0.0.1:8080` | `http://api:8080` |
 
-После входа панель «Учётная запись» показывает профиль и позволяет вызвать публичный, пользовательский и административный маршруты. Без токена защищённые маршруты возвращают 401, а без нужной роли — 403. После обновления страницы или истечения токена войдите снова.
-
-## Маршруты разработки
-
-Vite проксирует:
-
-| Путь в браузере | Сервис | Путь в сервисе |
-| --- | --- | --- |
-| `/api/health`, `/api/vision/detect` | `cv-test` на `127.0.0.1:8000` | `/health`, `/vision/detect` |
-| `/auth-api/public`, `/auth-api/me`, `/auth-api/user`, `/auth-api/admin` | Kotlin API на `127.0.0.1:8080` | `/api/public`, `/api/me`, `/api/user`, `/api/admin` |
-
-Адреса сервисов можно переопределить в `.env` по образцу `.env.example`: `CV_API_URL` и `KEYCLOAK_API_URL`. После изменения перезапустите Vite. Сам обмен authorization code на токены выполняется браузером напрямую с Keycloak на `localhost:8081`; web origin должен быть разрешён в realm.
+Сборка в Docker использует [nginx.conf](nginx.conf), поэтому те же маршруты работают и без Vite.
+Прокси допускает загрузку 10 MiB изображения с multipart-заголовками и ждёт CPU-детекцию до 120 секунд.
+Обмен authorization code на токены браузер выполняет напрямую с Keycloak на `localhost:8081`.
 
 ## Сборка
 
-```powershell
-npm.cmd run build
+```bash
+npm run build
 ```
 
-Сборка создаёт `dist/`. При размещении собранного UI настройте внешний прокси с теми же маршрутами `/api` и `/auth-api`, а в клиенте `demo-browser` обновите redirect URI, post logout redirect URI и web origin на адрес размещённого UI. Прокси Vite действует только в режиме разработки.
+Сборка создаёт `dist/`. Dockerfile собирает UI через `npm ci` и обслуживает `dist/` в Nginx.
+Сборку контейнера, запуск и интеграционные проверки выполняет CI корневого репозитория.
+При изменении адреса размещения UI обновите redirect URI, post logout redirect URI и web origin клиента `demo-browser` в Keycloak.
