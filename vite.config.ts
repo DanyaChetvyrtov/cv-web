@@ -1,4 +1,4 @@
-﻿import { defineConfig, loadEnv } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig(({ mode }) => {
@@ -11,14 +11,8 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       proxy: {
         '/api': {
-          target: env.CV_API_URL || 'http://127.0.0.1:8000',
+          target: env.BFF_API_URL || 'http://127.0.0.1:8080',
           changeOrigin: true,
-          rewrite: (url) => url.replace(/^\/api/, ''),
-        },
-        '/auth-api': {
-          target: env.KEYCLOAK_API_URL || 'http://127.0.0.1:8080',
-          changeOrigin: true,
-          rewrite: (url) => url.replace(/^\/auth-api/, '/api'),
         },
       },
     },

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent } from 'react'
 import AuthPanel from './AuthPanel'
+import { apiFetch } from './api'
 
 type BoundingBox = { x1: number; y1: number; x2: number; y2: number }
 type Detection = { class_id: number; label: string; confidence: number; bbox: BoundingBox }
@@ -33,6 +34,7 @@ function errorDetail(body: unknown, status: number) {
 }
 
 function App() {
+  const [authenticated, setAuthenticated] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
   const activeRequest = useRef<AbortController | null>(null)
@@ -136,7 +138,7 @@ function App() {
     const form = new FormData()
     form.append('image', file)
     try {
-      const response = await fetch('/api/vision/detect?confidence=' + (confidence / 100), {
+      const response = await apiFetch('/api/vision/detect?confidence=' + (confidence / 100), {
         method: 'POST',
         body: form,
         signal: controller.signal,
@@ -145,7 +147,7 @@ function App() {
       try {
         body = await response.json()
       } catch {
-        throw new Error(response.ok ? 'API вернул некорректный JSON.' : 'Сервис cv-test недоступен. Запустите API на localhost:8000.')
+        throw new Error(response.ok ? 'API вернул некорректный JSON.' : 'Kotlin BFF или внутренний CV-сервис недоступен.')
       }
       if (!response.ok) throw new Error(errorDetail(body, response.status))
       const data = body as DetectionResult
@@ -231,7 +233,7 @@ function App() {
           <p>Загрузите изображение, настройте порог уверенности и запустите распознавание. Результат появится прямо на снимке.</p>
         </section>
 
-        <AuthPanel />
+        <AuthPanel onAuthenticationChange={setAuthenticated} />
 
         <div className="workspace">
           <section className="panel input-panel" aria-labelledby="input-title">
@@ -268,10 +270,10 @@ function App() {
               <input id="confidence" type="range" min={1} max={100} value={confidence} onChange={(event) => setConfidence(Number(event.target.value))} />
               <div className="range-ends"><span>Больше объектов</span><span>Точнее результат</span></div>
             </div>
-            <button className="primary-button" type="button" disabled={!file || viewState === 'loading'} onClick={() => void runDetection()}>
-              <span>{viewState === 'loading' ? 'Выполняем детекцию…' : 'Запустить детекцию'}</span><span aria-hidden="true">↗</span>
+            <button className="primary-button" type="button" disabled={!authenticated || !file || viewState === 'loading'} onClick={() => void runDetection()}>
+              <span>{!authenticated ? 'Войдите для запуска детекции' : viewState === 'loading' ? 'Выполняем детекцию…' : 'Запустить детекцию'}</span><span aria-hidden="true">↗</span>
             </button>
-            <p className="input-note">Изображение отправляется в локальный сервис cv-test.</p>
+            <p className="input-note">Изображение отправляется в Kotlin BFF, затем во внутренний CV-сервис.</p>
           </section>
 
           <section className="panel result-panel" aria-labelledby="result-title">
@@ -332,12 +334,12 @@ function App() {
                 </div>
               ))}</div> : <div className="no-objects">При текущем пороге уверенности объекты не найдены. Попробуйте уменьшить порог.</div>
             ) : (
-              <div className="json-view"><div className="json-toolbar"><span>Ответ /vision/detect</span><button type="button" onClick={() => void copyJson()}>{copied ? 'Скопировано' : 'Копировать JSON'}</button></div><pre>{JSON.stringify(result, null, 2)}</pre></div>
+              <div className="json-view"><div className="json-toolbar"><span>Ответ /api/vision/detect</span><button type="button" onClick={() => void copyJson()}>{copied ? 'Скопировано' : 'Копировать JSON'}</button></div><pre>{JSON.stringify(result, null, 2)}</pre></div>
             )}
           </section>
         )}
       </main>
-      <footer className="footer"><span>CV LAB / LOCAL TESTING</span><span>{health ? 'Модель: ' + health.model + ' · ' + health.device : 'API: localhost:8000'}</span></footer>
+      <footer className="footer"><span>CV LAB / LOCAL TESTING</span><span>{health ? 'Модель: ' + health.model + ' · ' + health.device : 'Проверяем доступность сервиса'}</span></footer>
     </div>
   )
 }
