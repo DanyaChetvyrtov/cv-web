@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent } from 'react'
 import AuthPanel from './AuthPanel'
-import { apiFetch } from './api'
+import { apiFetch, type Profile } from './api'
+import EmployeesPanel from './EmployeesPanel'
 
 type BoundingBox = { x1: number; y1: number; x2: number; y2: number }
 type Detection = { class_id: number; label: string; confidence: number; bbox: BoundingBox }
@@ -34,7 +35,8 @@ function errorDetail(body: unknown, status: number) {
 }
 
 function App() {
-  const [authenticated, setAuthenticated] = useState(false)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const authenticated = profile !== null
   const fileInput = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
   const activeRequest = useRef<AbortController | null>(null)
@@ -228,12 +230,13 @@ function App() {
 
       <main>
         <section className="intro">
-          <div className="eyebrow"><span className="eyebrow-line" /> ДЕТЕКЦИЯ ОБЪЕКТОВ · YOLO11</div>
+          <div className="eyebrow"><span className="eyebrow-line" /> КОМПЬЮТЕРНОЕ ЗРЕНИЕ · ЛОКАЛЬНЫЕ МОДЕЛИ</div>
           <h1>Посмотрим, что видит <em>модель.</em></h1>
-          <p>Загрузите изображение, настройте порог уверенности и запустите распознавание. Результат появится прямо на снимке.</p>
+          <p>Добавьте сотрудника, проверьте человека по фотографии или распознайте объекты на изображении.</p>
         </section>
 
-        <AuthPanel onAuthenticationChange={setAuthenticated} />
+        <AuthPanel onProfileChange={setProfile} />
+        <EmployeesPanel profile={profile} />
 
         <div className="workspace">
           <section className="panel input-panel" aria-labelledby="input-title">

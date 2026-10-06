@@ -4,7 +4,7 @@ import { apiFetch, loadProfile, startLogin, submitLogout, type Profile } from '.
 type Endpoint = 'public' | 'me' | 'user' | 'admin'
 type ApiResult = { endpoint: Endpoint; status: number; body: string }
 
-export default function AuthPanel({ onAuthenticationChange }: { onAuthenticationChange: (authenticated: boolean) => void }) {
+export default function AuthPanel({ onProfileChange }: { onProfileChange: (profile: Profile | null) => void }) {
   const [retry, setRetry] = useState(0)
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -23,7 +23,7 @@ export default function AuthPanel({ onAuthenticationChange }: { onAuthentication
     void loadProfile().then((loaded) => {
       if (!active) return
       setProfile(loaded)
-      onAuthenticationChange(loaded !== null)
+      onProfileChange(loaded)
       setPhase('ready')
       setMessage(loginFailed ? 'Вход не завершён. Повторите попытку.' : loaded ? 'Вы вошли. Сессией управляет Kotlin BFF.' : 'Вы не вошли.')
     }).catch((error: unknown) => {
@@ -33,12 +33,12 @@ export default function AuthPanel({ onAuthenticationChange }: { onAuthentication
     })
     const expire = () => {
       setProfile(null)
-      onAuthenticationChange(false)
+      onProfileChange(null)
       setMessage('Сессия истекла. Войдите снова.')
     }
     window.addEventListener('bff-session-expired', expire)
     return () => { active = false; window.removeEventListener('bff-session-expired', expire) }
-  }, [retry, onAuthenticationChange])
+  }, [retry, onProfileChange])
 
   useEffect(() => {
     if (!profile) return
@@ -47,12 +47,12 @@ export default function AuthPanel({ onAuthenticationChange }: { onAuthentication
       void loadProfile().then((loaded) => {
         if (!active) return
         setProfile(loaded)
-        onAuthenticationChange(loaded !== null)
+        onProfileChange(loaded)
         if (!loaded) setMessage('Сессия истекла. Войдите снова.')
       }).catch(() => { /* Keep the session during a transient network outage. */ })
     }, 30000)
     return () => { active = false; window.clearInterval(timer) }
-  }, [profile, onAuthenticationChange])
+  }, [profile, onProfileChange])
 
   async function callEndpoint(endpoint: Endpoint) {
     setRequesting(true)
@@ -64,7 +64,7 @@ export default function AuthPanel({ onAuthenticationChange }: { onAuthentication
       setApiResult({ endpoint, status: response.status, body })
       if (endpoint === 'me' && response.ok) {
         setProfile(JSON.parse(raw) as Profile)
-        onAuthenticationChange(true)
+        onProfileChange(JSON.parse(raw) as Profile)
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Не удалось обратиться к Kotlin BFF.')

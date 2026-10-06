@@ -6,7 +6,7 @@ BFF устанавливает HttpOnly-cookie `BFFSESSION` и хранит OAut
 
 ## Запуск
 
-Используйте единый Compose из [cv-complex-test](https://github.com/DanyaChetvyrtov/cv-complex-test).
+Используйте единый Compose из [cv-complex-test](https://github.com/DanyaChetvyrtov/cv-root).
 В этом модуле Compose-файлов нет. Dockerfile собирает React, Nginx обслуживает UI
 и направляет весь `/api/*` в Kotlin **без переписывания пути**.
 
@@ -52,3 +52,15 @@ npm run build
 Результат — `dist/`. CI модуля проверяет TypeScript и сборку; CI корня проверяет полный Docker/BFF-поток.
 [nginx.conf](nginx.conf) проксирует только Kotlin, не Python.
 При смене публичного origin обновите `BFF_PUBLIC_URL` на сервере и разрешённые callback/logout URL клиента в Keycloak.
+
+## Employee checkpoint
+
+The «Пропускной пункт» panel supports employee enrollment, a paged directory, removal, and identification from a new photo.
+Log in as `manager / manager123` to manage employees (ADMIN + USER), or `demo / demo123` to identify (USER).
+Registration accepts employee code, full name, optional department and a JPEG/PNG/WEBP photo up to 10 MiB with exactly one face.
+An employee in the business registry does not need a Keycloak account.
+
+React sends all operations through the BFF using the existing HttpOnly session and CSRF protection. Face vectors and
+source enrollment photos are not retained in browser storage. A match shows employee metadata and the cosine similarity;
+unknown/ambiguous results show no selected identity. The interface explains that similarity is not a probability and that
+this demo cannot verify liveness. Deleting a record also deletes its face template.
